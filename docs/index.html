@@ -1836,20 +1836,10 @@ function drawPlayer() {
   if (player.hurtT > 0 && Math.floor(player.hurtT * 12) % 2 === 0) return;
   const cx = x + player.w / 2, cy = y + player.h / 2;
   drawShadow(cx, y + player.h + 2, 9, 3.5, 0.28);
-  if (drawSprite('ninja', cx, cy, 36, 36)) {
-    if (player.stealth) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.globalAlpha = 0.35 + Math.sin(Date.now() / 180) * 0.12;
-      const sg = ctx.createRadialGradient(0, 0, 4, 0, 0, 28);
-      sg.addColorStop(0, 'rgba(80,0,120,0.7)');
-      sg.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = sg;
-      ctx.beginPath(); ctx.ellipse(0, 4, 28, 20, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-    return;
-  }
+  // NOTE: the CDN 'ninja' sprite is a single static pose with no walk-cycle
+  // frames, so drawing it directly while moving looks like sliding rather
+  // than walking. Procedural art below has real leg-swing animation, so it's
+  // used for the player unconditionally.
   const bob = player.moving ? Math.sin(player.walkT * 11) * 1.3 : Math.sin(lastT / 600) * 0.6;
   ctx.save();
   ctx.translate(cx, cy + bob * 0.4);
@@ -2013,15 +2003,10 @@ function drawEnemy(e) {
   const moving = Math.abs(e.dirX) + Math.abs(e.dirY) > 0.1;
   if (e.type === 'bat') drawShadow(ecx, e.y + e.h + 8, 6, 2, 0.15);
   else drawShadow(ecx, e.y + e.h + 1, e.w / 2, 3, 0.22);
-  if (drawSprite(e.type, ecx, ecy, e.w + 10, e.h + 10)) {
-    if (e.type === 'samurai') {
-      const hpFrac = e.hp / e.maxHp;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(ecx - 14, ecy - e.h / 2 - 12, 28, 4);
-      ctx.fillStyle = hpFrac > 0.5 ? '#50e050' : hpFrac > 0.25 ? '#e0c020' : '#e04020';
-      ctx.fillRect(ecx - 14, ecy - e.h / 2 - 12, 28 * hpFrac, 4);
-    }
-  } else {
+  // NOTE: same reasoning as drawPlayer() — the CDN enemy sprites are single
+  // static poses with no walk-cycle frames, so they'd slide rather than
+  // walk. Procedural art (with per-type leg-swing / wing-flap animation) is
+  // used unconditionally instead.
   ctx.save();
   ctx.translate(ecx, ecy);
   if (e.hurtT > 0) ctx.globalAlpha = 0.6;
@@ -2179,7 +2164,6 @@ function drawEnemy(e) {
     ctx.fillRect(-14, -30, 28 * hpFrac, 4);
   }
   ctx.restore();
-  }
   if (e.aiState === 'alert' || e.aiState === 'chase') {
     const ecx2 = e.x + e.w / 2, ecy2 = e.y - 8;
     const blink = Math.sin(Date.now() / 120) > 0;
