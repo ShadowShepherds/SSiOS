@@ -776,6 +776,30 @@ function canStand(x, y) {
   return true;
 }
 
+// Entry-point snapping for screen transitions: find the nearest walkable
+// column/row on the destination edge so the player never lands inside a
+// wall when two adjacent maps' border paths don't line up exactly.
+function snapEntryX(map, ty, preferredPx) {
+  const preferredTx = Math.max(0, Math.min(COLS - 1, Math.floor(preferredPx / TILE)));
+  if (WALKABLE.has(map[ty][preferredTx])) return preferredPx;
+  for (let d = 1; d < COLS; d++) {
+    const left = preferredTx - d, right = preferredTx + d;
+    if (left >= 0 && WALKABLE.has(map[ty][left])) return left * TILE + (TILE - player.w) / 2;
+    if (right < COLS && WALKABLE.has(map[ty][right])) return right * TILE + (TILE - player.w) / 2;
+  }
+  return preferredPx;
+}
+function snapEntryY(map, tx, preferredPy) {
+  const preferredTy = Math.max(0, Math.min(ROWS - 1, Math.floor(preferredPy / TILE)));
+  if (WALKABLE.has(map[preferredTy][tx])) return preferredPy;
+  for (let d = 1; d < ROWS; d++) {
+    const up = preferredTy - d, down = preferredTy + d;
+    if (up >= 0 && WALKABLE.has(map[up][tx])) return up * TILE + (TILE - player.h) / 2;
+    if (down < ROWS && WALKABLE.has(map[down][tx])) return down * TILE + (TILE - player.h) / 2;
+  }
+  return preferredPy;
+}
+
 // ---------------- Enemies ----------------
 const ENEMY_DEFS = {
   bat:     { hp: 2,  speed: 55, dmg: 1, size: 18, flies: true,  coin: 1, detectR: 999 },
@@ -1010,10 +1034,15 @@ function update(dt) {
 
   const scr = SCREENS[state.screen];
   const ex = scr.exits || {};
-  if (state.px < -6 && ex.left) return loadScreen(ex.left, (COLS - 1) * TILE - player.w, state.py);
-  if (state.px > COLS * TILE - player.w + 6 && ex.right) return loadScreen(ex.right, 2, state.py);
-  if (state.py < -6 && ex.up) return loadScreen(ex.up, state.px, (ROWS - 1) * TILE - player.h);
-  if (state.py > ROWS * TILE - player.h + 6 && ex.down) return loadScreen(ex.down, state.px, 2);
+  // Adjacent screens' border paths don't always line up column-for-column
+  // (e.g. a wide mountain pass opening onto a narrow bamboo-forest gap), so
+  // snap the entry point to the nearest walkable tile on the destination's
+  // edge instead of blindly carrying over the exact px/py — otherwise the
+  // player can land inside a solid tile and get stuck at the border.
+  if (state.px < -6 && ex.left) return loadScreen(ex.left, (COLS - 1) * TILE - player.w, snapEntryY(SCREENS[ex.left].map, COLS - 1, state.py));
+  if (state.px > COLS * TILE - player.w + 6 && ex.right) return loadScreen(ex.right, 2, snapEntryY(SCREENS[ex.right].map, 0, state.py));
+  if (state.py < -6 && ex.up) return loadScreen(ex.up, snapEntryX(SCREENS[ex.up].map, ROWS - 1, state.px), (ROWS - 1) * TILE - player.h);
+  if (state.py > ROWS * TILE - player.h + 6 && ex.down) return loadScreen(ex.down, snapEntryX(SCREENS[ex.down].map, 0, state.px), 2);
   state.px = Math.max(-6, Math.min(COLS * TILE - player.w + 6, state.px));
   state.py = Math.max(-6, Math.min(ROWS * TILE - player.h + 6, state.py));
 
